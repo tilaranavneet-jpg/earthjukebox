@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Earth Beats — NASA Space & Satellite Sonification Studio</title>
+
+  <!-- NASA & Deep Space Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Three.js 3D & OrbitControls (Ultra-Reliable CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <!-- Leaflet.js (HD Satellite Engine) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- External Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="nasa-layout">
+
+    <!-- 1. TOP HEADER & MISSION CONTROL -->
+    <header class="nasa-top-header">
+      <div>
+        <div class="brand-title-row">
+          <h1 class="brand-title">Earth Beats</h1>
+          <span class="nasa-badge">NASA</span>
+          <span class="flight-spec-badge">EOS SATELLITE SONIFICATION STUDIO</span>
+        </div>
+        <p class="brand-desc">
+          Pick a NASA satellite view of our planet. Press play and hear an expansive four-part cosmic song synthesized directly from Earth's environmental colours, ocean currents, and dynamics.
+        </p>
+      </div>
+
+      <div class="mission-clock-cluster">
+        <div class="clock-pill">
+          <span class="clock-label">UNIVERSAL TIME</span>
+          <span class="clock-digits cyan" id="utcClock">14:26:00 UTC</span>
+        </div>
+        <div class="clock-pill">
+          <span class="clock-label">MISSION ELAPSED (MET)</span>
+          <span class="clock-digits emerald" id="metClock">T+08:24:12</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. PHENOMENON SELECTOR RIBBON -->
+    <nav class="phenomenon-ribbon" aria-label="Phenomenon Selector">
+      <button class="tab-btn active" data-mode="temperature" data-title="SEA SURFACE TEMPERATURE & OCEAN CURRENTS">
+        <span class="phenom-glow-dot" style="background: #f59e0b; box-shadow: 0 0 10px #f59e0b;"></span>
+        <span>Sea temperature (SST)</span>
+      </button>
+      <button class="tab-btn" data-mode="currents" data-title="OCEAN CURRENTS & ATMOSPHERIC AIRFLOW">
+        <span class="phenom-glow-dot" style="background: #00f2fe; box-shadow: 0 0 10px #00f2fe;"></span>
+        <span>Ocean currents & Winds</span>
+      </button>
+      <button class="tab-btn" data-mode="vegetation" data-title="GLOBAL VEGETATION CANOPY (NDVI)">
+        <span class="phenom-glow-dot" style="background: #10b981; box-shadow: 0 0 10px #10b981;"></span>
+        <span>Vegetation canopy (NDVI)</span>
+      </button>
+      <button class="tab-btn" data-mode="pollution" data-title="TROPOSPHERIC AIR POLLUTION (NO₂)">
+        <span class="phenom-glow-dot" style="background: #a855f7; box-shadow: 0 0 10px #a855f7;"></span>
+        <span>Air pollution (NO₂)</span>
+      </button>
+      <button class="tab-btn" data-mode="rainfall" data-title="PRECIPITATION & ATMOSPHERIC MOISTURE">
+        <span class="phenom-glow-dot" style="background: #38bdf8; box-shadow: 0 0 10px #38bdf8;"></span>
+        <span>Rainfall & Moisture</span>
+      </button>
+      <button class="tab-btn" data-mode="lights" data-title="EARTH AT NIGHT & URBAN RADIANCE (VIIRS)">
+        <span class="phenom-glow-dot" style="background: #facc15; box-shadow: 0 0 10px #facc15;"></span>
+        <span>Night lights (VIIRS)</span>
+      </button>
+      <button class="tab-btn" data-mode="demo" data-title="BLUE MARBLE PLANETARY BASELINE">
+        <span class="phenom-glow-dot" style="background: #60a5fa; box-shadow: 0 0 10px #60a5fa;"></span>
+        <span>Demo Earth (offline)</span>
+      </button>
+    </nav>
+
+    <!-- 3. DATE & SATELLITE CONTROLS BAR -->
+    <div class="date-control-bar">
+      <div class="date-inputs-group">
+        <div class="date-item">
+          <span>Date</span>
+          <input type="date" value="2026-11-05" class="input-date-styled" id="inputObsDate">
+        </div>
+
+        <label class="compare-checkbox-label">
+          <input type="checkbox" id="checkCompare" checked>
+          <span>Compare with an earlier date</span>
+        </label>
+
+        <div class="date-item" id="earlierDateGroup">
+          <span>Earlier date</span>
+          <input type="date" value="2016-11-09" class="input-date-styled" id="inputBaseDate">
+        </div>
+
+        <button class="btn-load" id="btnSyncEOS">Load</button>
+      </div>
+
+      <div class="upload-image-box">
+        <span>Your own image</span>
+        <label class="btn-choose-file">
+          Choose file
+          <input type="file" accept="image/*" class="file-input-hidden" id="fileUploadInput">
+        </label>
+      </div>
+
+      <!-- MAP LABELS & HYBRID PRECISION TOGGLE -->
+      <button class="label-toggle-btn active" id="btnToggleLabels" title="Toggle Google Maps-Style Precision City Names, Roads & Places">
+        🗺️ Google Hybrid Labels: ON
+      </button>
+
+      <!-- SATELLITE CLOUDS TOGGLE -->
+      <button class="cloud-toggle-btn active" id="btnToggleClouds" title="Toggle Animated Atmospheric Drifting Clouds">
+        ☁️ Clouds: ON
+      </button>
+
+      <!-- EXACT TWO OPTIONS: Satellite Map & 3D Globe -->
+      <div class="view-toggle-cluster">
+        <button class="view-toggle-btn active" id="btnViewSatellite">
+          🛰️ Satellite Map
+        </button>
+        <button class="view-toggle-btn" id="btnView3D">
+          🌍 3D Space Globe
+        </button>
+      </div>
+    </div>
+
+    <!-- 4. GRAND VIEWPORT STAGE (Spacious 640px) -->
+    <main class="map-display-card" id="mainViewportStage">
+      
+      <!-- Top Left: Date Range & Phenomenon Title Badge (NASA HUD) -->
+      <div class="hud-top-left-cluster">
+        <div class="badge-date-range-pill" id="badgeDateRange">
+          <span>2016-11-09</span>
+          <span class="range-arrow">↔</span>
+          <span id="labelObsDate">2026-11-05</span>
+        </div>
+        <div class="badge-dataset-title" id="badgeDatasetTitle">
+          SEA SURFACE TEMPERATURE & OCEAN CURRENTS
+        </div>
+      </div>
+
+      <!-- Top Right: NASA Telemetry Stack HUD (Coordinates, Temp, Note, Air Direction) -->
+      <div class="hud-telemetry-cluster" id="hudCluster">
+        <div class="hud-badge-card">
+          <span class="hud-badge-tag">COORDINATES:</span>
+          <span class="hud-badge-val" id="hudCoordVal">30.15° N, 78.00° E</span>
+        </div>
+        <div class="hud-badge-card">
+          <span class="hud-badge-tag">INTENSITY / TEMP:</span>
+          <span class="hud-badge-val cyan" id="hudTempVal">+24.5°C (Mild Temperate)</span>
+        </div>
+        <div class="hud-badge-card">
+          <span class="hud-badge-tag">SONIC NOTE:</span>
+          <span class="hud-badge-val gold" id="hudNoteVal">G4 (392 Hz) • 94 dB</span>
+        </div>
+        <div class="hud-badge-card air-dir-card">
+          <span class="hud-badge-tag">AIR DIRECTION:</span>
+          <span class="hud-badge-val emerald" id="hudAirVal">
+            <span class="compass-icon">🧭</span>
+            <span id="hudAirText">85° E • 24.0 kts (Tropical Trade Winds)</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Laser Scan Line (Sweeps across the viewport during symphony playback) -->
+      <div class="map-scan-line" id="flatScanLine" style="display: none;"></div>
+
+      <!-- VIEW 1: Ultra-HD Satellite Engine (Leaflet + Drifting Clouds + Ocean Vectors + NASA Pointers) -->
+      <div class="map-canvas-container" id="satelliteMount">
+        <div id="leafletMap"></div>
+        <!-- Atmospheric Cloud Overlay Canvas (Animated Volumetric Drifting Clouds) -->
+        <canvas id="satCloudsCanvas"></canvas>
+        <!-- Wind & Current Vector Overlay Canvas (Animated Flow Vectors) -->
+        <canvas id="satVectorsCanvas"></canvas>
+
+        <!-- NASA Space Hover Pointer (Tooltip Bubble + Radar Ring) -->
+        <div class="satellite-nasa-pointer" id="satellitePointer" style="display: none;">
+          <div class="pointer-bubble" id="pointerBubbleText">30.15° N, 78.00° E • +24.5°C</div>
+          <div class="pointer-radar-core"></div>
+          <div class="pointer-radar-ring"></div>
+        </div>
+      </div>
+
+      <!-- VIEW 2: Photorealistic 3D NASA Apollo/Blue Marble Space Globe Container (NO WHITE RINGS) -->
+      <div class="three-canvas-container" id="threeMount" style="display: none;"></div>
+
+      <!-- 3D Orbit Camera Glide Controls (Visible in 3D Mode) -->
+      <div class="orbit-controls-bar" id="orbitControlsBar" style="display: none;">
+        <div style="display: flex; gap: 6px;">
+          <button class="glide-btn" id="glideNorth">⬆️ Arctic</button>
+          <button class="glide-btn" id="glideEquator">☀️ Equator</button>
+          <button class="glide-btn" id="glideSouth">⬇️ Antarctic</button>
+          <button class="glide-btn" id="glideGlobal">🌍 Global</button>
+        </div>
+        <div class="divider-pipe"></div>
+        <button class="action-pill-btn active" id="btnAutoRotate">
+          🔄 Auto-Spin ON
+        </button>
+      </div>
+
+    </main>
+
+    <!-- 5. REAL-TIME PARAMETER MODULATORS (4-GRID PANEL) -->
+    <section class="environmental-controls-section" aria-label="Environmental Parameter Modulators">
+      <div class="section-title-row">
+        <span class="section-title-tag">ATMOSPHERIC DYNAMICS & CLOUD CONTROLLERS</span>
+        <span class="section-title-sub">REAL-TIME WIND VECTOR, DRIFT SPEED & VAPOR DENSITY SYNCHRONIZATION</span>
+      </div>
+
+      <div class="controls-four-grid">
+        <!-- Modulator 1: Thermal Shift -->
+        <div class="modulator-card">
+          <div class="mod-header">
+            <span class="mod-title">🌡️ Thermal Anomaly Shift</span>
+            <span class="mod-val cyan" id="valThermal">0.0°C</span>
+          </div>
+          <input type="range" min="-50" max="50" value="0" class="nasa-slider" id="sliderThermal">
+          <div class="mod-scale">
+            <span>-5.0°C (Polar Glacial)</span>
+            <span>0.0°C (Nominal)</span>
+            <span>+5.0°C (Thermal Surge)</span>
+          </div>
+        </div>
+
+        <!-- Modulator 2: Airflow & Cloud Drift Speed -->
+        <div class="modulator-card">
+          <div class="mod-header">
+            <span class="mod-title">💨 Airflow & Cloud Drift Speed</span>
+            <span class="mod-val emerald" id="valAirspeed">24 kts</span>
+          </div>
+          <input type="range" min="4" max="90" value="24" class="nasa-slider" id="sliderAirspeed">
+          <div class="mod-scale">
+            <span>4 kts (Breeze)</span>
+            <span>24 kts (Nominal)</span>
+            <span>90 kts (Cyclone Gale)</span>
+          </div>
+        </div>
+
+        <!-- Modulator 3: Cloud Vapor Density -->
+        <div class="modulator-card">
+          <div class="mod-header">
+            <span class="mod-title">💧 Cloud Vapor Density</span>
+            <span class="mod-val purple" id="valVapor">75%</span>
+          </div>
+          <input type="range" min="5" max="100" value="75" class="nasa-slider" id="sliderVapor">
+          <div class="mod-scale">
+            <span>5% (Arid Sky)</span>
+            <span>65% (Nominal Clouds)</span>
+            <span>100% (Dense Stratocumulus)</span>
+          </div>
+        </div>
+
+        <!-- Modulator 4: Wind & Cloud Vector Direction (0° to 360°) -->
+        <div class="modulator-card">
+          <div class="mod-header">
+            <span class="mod-title">🧭 Wind & Cloud Vector Direction</span>
+            <span class="mod-val gold" id="valWindDir">85° E</span>
+          </div>
+          <input type="range" min="0" max="360" value="85" class="nasa-slider" id="sliderWindDir">
+          <div class="mod-scale">
+            <span>0° (North)</span>
+            <span>90° (East)</span>
+            <span>180° (South)</span>
+            <span>270° (West)</span>
+            <span>360° (N)</span>
+          </div>
+          <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
+            <button class="mini-chip-btn" id="btnDynamicWind">🔄 Auto-Shifting Wind Vector: OFF</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. COSMIC SONIFICATION MASTER DECK & 4-STEM MIXER -->
+    <section class="audio-master-deck" aria-label="Sonic Master Deck">
+      <div class="deck-top-row">
+        <!-- Play / Pause & Loop Transport Cluster -->
+        <div class="transport-cluster">
+          <button class="btn-play-primary" id="btnPlayMain">
+            <span class="play-triangle-icon" id="playIcon">▶</span>
+            <span id="playBtnText">Play Earth Symphony</span>
+          </button>
+          <button class="transport-pill-btn active" id="btnToggleLoop">
+            🔁 Loop: ON
+          </button>
+          <button class="transport-pill-btn" id="btnSonifyCenter">
+            🎯 Resonate Current Position
+          </button>
+        </div>
+
+        <!-- Oscilloscope Waveform Canvas -->
+        <div class="oscilloscope-wrapper">
+          <div class="scope-legend-row">
+            <span class="scope-tag">REAL-TIME SPECTRAL OSCILLOSCOPE</span>
+            <span class="scope-status" id="scopeStatus">AUDIO STANDBY</span>
+          </div>
+          <canvas id="audioVisualizerCanvas"></canvas>
+        </div>
+
+        <!-- Master Volume & +12dB Booster -->
+        <div class="master-gain-cluster">
+          <div class="master-gain-header">
+            <span class="gain-label">MASTER GAIN</span>
+            <span class="gain-val" id="valMasterGain">100%</span>
+          </div>
+          <input type="range" min="0" max="150" value="100" class="nasa-slider" id="sliderMasterGain">
+          <button class="booster-toggle-btn active" id="btnMasterBoost" title="Adds +12dB studio compression and acoustic saturation">
+            ⚡ +12 dB Loudness Boost: ON
+          </button>
+        </div>
+      </div>
+
+      <!-- 4-Stem Environmental Synthesizer Mixer -->
+      <div class="stems-mixer-shelf">
+        <!-- Stem 1: Deep Earth Drone -->
+        <div class="stem-channel-card">
+          <div class="stem-header-row">
+            <span class="stem-title">🌊 Deep Earth Drone</span>
+            <button class="stem-mute-chip" data-stem="drone">MUTE</button>
+          </div>
+          <div class="stem-role-caption">SST & Crustal Sub-Bass (40-90 Hz)</div>
+          <input type="range" min="0" max="100" value="85" class="stem-fader" data-stem="drone">
+          <div class="stem-meter-bar"><div class="meter-fill" id="meterDrone" style="width: 85%;"></div></div>
+        </div>
+
+        <!-- Stem 2: Thermal Shimmer -->
+        <div class="stem-channel-card">
+          <div class="stem-header-row">
+            <span class="stem-title">✨ Thermal Shimmer</span>
+            <button class="stem-mute-chip" data-stem="shimmer">MUTE</button>
+          </div>
+          <div class="stem-role-caption">Solar Heat Harmonic Chords</div>
+          <input type="range" min="0" max="100" value="80" class="stem-fader" data-stem="shimmer">
+          <div class="stem-meter-bar"><div class="meter-fill" id="meterShimmer" style="width: 80%;"></div></div>
+        </div>
+
+        <!-- Stem 3: Airflow Wind Resonator -->
+        <div class="stem-channel-card">
+          <div class="stem-header-row">
+            <span class="stem-title">🌪️ Airflow Resonator</span>
+            <button class="stem-mute-chip" data-stem="wind">MUTE</button>
+          </div>
+          <div class="stem-role-caption">Currents & Cloud Drift Swell</div>
+          <input type="range" min="0" max="100" value="90" class="stem-fader" data-stem="wind">
+          <div class="stem-meter-bar"><div class="meter-fill" id="meterWind" style="width: 90%;"></div></div>
+        </div>
+
+        <!-- Stem 4: Cloud Vapor Rain Chime -->
+        <div class="stem-channel-card">
+          <div class="stem-header-row">
+            <span class="stem-title">💧 Vapor Rain Chime</span>
+            <button class="stem-mute-chip" data-stem="rain">MUTE</button>
+          </div>
+          <div class="stem-role-caption">Atmospheric Pentatonic Grains</div>
+          <input type="range" min="0" max="100" value="85" class="stem-fader" data-stem="rain">
+          <div class="stem-meter-bar"><div class="meter-fill" id="meterRain" style="width: 85%;"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. NASA MISSION FOOTER -->
+    <footer class="nasa-footer">
+      <div class="footer-left">
+        <span class="footer-dot"></span>
+        <span>NASA EARTH OBSERVING SYSTEM (EOS) • SATELLITE SONIFICATION PROJECT</span>
+      </div>
+      <div class="footer-right">
+        <span>DATA FEEDS: GOOGLE SATELLITE HYBRID • NASA BLUE MARBLE • NOAA OISST • MODIS • VIIRS</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Main Unified Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
